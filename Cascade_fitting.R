@@ -9,6 +9,11 @@ tetR_const = 1;
 k_aTc = 10;
 n_aTc = 4;
 tetR_sigmoid <- y ~ a + b/(1 + (tetR_const/((1 + (aTc/k_aTc)^n_aTc)*k))^n)
+### Linh: In the above model (i.e. tetR_sigmoid), each pTET mutant has 4 parameters: 
+###           a (basal expression)
+###           b (strength)
+###           k (affinity)
+###           n (cooperativity)
 pTET_parameter <- matrix(0, nrow = 4, ncol = ncol(pTET_mat) - 1)
 for (mutant in (2:ncol(pTET_mat))) {
 	print("******************************");
@@ -26,6 +31,7 @@ for (mutant in (2:ncol(pTET_mat))) {
 	obj_w <- 1/ydat;
 	print(ydat);
 	print(obj_w);
+	### Linh: I used nls (non-linear least square) to fit 4 parameters of each mutant with the experimental data
 	anlsb1 <- try(nls(tetR_sigmoid, start = init_val, lower = lower_bound, upper = upper_bound, data = tetR_data, algorithm = "port", weights = obj_w))
 	tetR_data$predict <- predict(anlsb1,interval="predict")
 	print(tetR_data)
@@ -34,10 +40,14 @@ for (mutant in (2:ncol(pTET_mat))) {
 	#print(anlsb1)
 }
 
+### Linh: Until here (after the loop) all parameter values were found and stored in the matrix pTET_parameter.
+###       In pTET_parameter: Rows represent parameters, columns represent mutants
+
 araC_const = 1;
 k_Lara = 0.00001;
 n_Lara = 2;
 AraC_sigmoid <- y ~ a + b/(1 + (araC_const/((1 + (Lara/k_Lara)^n_Lara)*k))^n)
+### Linh: The above model is similar as the one of pTET
 pBAD_parameter <- matrix(0, nrow = 4, ncol = ncol(pBAD_mat) - 1)
 for (mutant in (2:ncol(pBAD_mat))) {
 	print("******************************");
@@ -61,6 +71,9 @@ for (mutant in (2:ncol(pBAD_mat))) {
 	#print(anlsb1)
 }
 print(pBAD_parameter);
+
+### Linh: Until here (after the loop) all parameter values were found and stored in the matrix pBAD_parameter.
+###       In pBAD_parameter: Rows represent parameters, columns represent mutants
 
 k_convert_gfp_to_tetR = 100;
 pTET_mut_name_list = colnames(pTET_mat);
@@ -95,13 +108,29 @@ for (cascade in (1:nrow(pBAD_pTET_mat))) {
 	n_pTET = pTET_parameter [4 ,pTET_idx];
 	
 	tetR_zero_ara = (a_pBAD + b_pBAD/(1 + (araC_const/k_pBAD)^n_pBAD))/k_convert_gfp_to_tetR;
+	### Linh: The above model is to predict the TetR where there is no L-arabinose
+	###       this model is the AraC_sigmoid model (line 49) but we set Lara = 0, 
+	###       and the output is normalized by a linear factor constant k_convert_gfp_to_tetR
 	tetR_0_1_ara = (a_pBAD + b_pBAD/(1 + (araC_const/((1 + (0.1/k_Lara)^n_Lara)*k_pBAD))^n_pBAD))/k_convert_gfp_to_tetR;
+	### Linh: Similarly, the above model is to predict the TetR where there 0.1% L-arabinose 
+	###       this model is the AraC_sigmoid model (line 49) but we set Lara = 0.1, 
+	###       and the output is normalized by a linear factor constant k_convert_gfp_to_tetR
 	#10ng/ml(aTc)
 	gfp_10ng_aTc = a_pTET + b_pTET/(1 + (tetR_zero_ara/((1 + (10/k_aTc)^n_aTc)*k_pTET))^n_pTET);
+	### Linh: The above model is to predict gfp when there is 10ng aTc
+	###       this model is the TetR_sigmoid model (line 11) but we set aTc = 10, 
+	###       and we set tetR_const = tetR_zero_ara as tetR is the output of the first module (i.e. the AraC_sigmoid model)
 	#0.1%ara+10ng/ml(aTc)
 	gfp_0_1_Lara_10ng_aTc = a_pTET + b_pTET/(1 + (tetR_0_1_ara/((1 + (10/k_aTc)^n_aTc)*k_pTET))^n_pTET);
+	### Linh: The above model is to predict the gfp when there is 10ng aTc and 0.1% L-arabinose
+	###       this model is the TetR_sigmoid model (line 11) but we set aTc = 10, 
+	###       and we set tetR_const = tetR_0_1_ara as 
+	###       tetR is the output of the first module (i.e. AraC_sigmoid model) when there is 0.1% L-arabinose,
 	#100ng/mL(aTc)		
 	gfp_100ng_aTc = a_pTET + b_pTET/(1 + (tetR_zero_ara/((1 + (100/k_aTc)^n_aTc)*k_pTET))^n_pTET);
+	### Linh: Similarly, the above model is to predict gfp when there is 100ng aTc
+	###       this model is the TetR_sigmoid model (line 11) but we set aTc = 100, and tetR_const = tetR_zero_ara 
+
 	final_mat[cascade,] = c(pBAD_pTET_mat[cascade,3], pBAD_pTET_mat[cascade,4], pBAD_pTET_mat[cascade,5], gfp_10ng_aTc, gfp_0_1_Lara_10ng_aTc, gfp_100ng_aTc);
 }
 print(final_mat);
